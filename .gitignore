@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+echo "venv/" >> .gitignore
+echo "__pycache__/" >> .gitignore
+echo ".DS_Store" >> .gitignore
+echo "mlruns/" >> .gitignore

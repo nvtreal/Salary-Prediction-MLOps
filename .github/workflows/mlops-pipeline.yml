@@ -1,0 +1,51 @@
+# File name: .github/workflows/mlops-pipeline.yml
+name: Salary Prediction CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # Stage 1: Continuous Integration (Testing)
+  CI_Testing:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pandas scikit-learn numpy flask
+
+    - name: Run Unit Tests (Data & Pipeline)
+      run: |
+        pytest tests/test_pipeline.py -v
+
+  # Stage 2: Continuous Deployment (Packaging)
+  CD_Deployment:
+    needs: CI_Testing
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v3
+
+    - name: Build Docker Image
+      run: |
+        docker build -t salary-prediction-app:latest .
+        
+    - name: Container Smoke Test (Verify Startup)
+      run: |
+        docker run -d -p 5002:5002 --name testing-app salary-prediction-app:latest
+        sleep 10
+        curl -f http://localhost:5002/ || exit 1
+        
+    - name: Pipeline Completed
+      run: echo "🚀 MLOps Pipeline Successful! Deployment Ready."

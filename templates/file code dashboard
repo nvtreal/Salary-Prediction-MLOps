@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MLOps Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .metric {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        canvas {
+            margin-top: 20px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 10px;
+        }
+
+        .alert {
+            background: red;
+            padding: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>🚀 MLOps Real-time Monitoring</h2>
+
+<div class="grid">
+    <div class="card">
+        <h4>Baseline</h4>
+        <div id="baseline" class="metric">-</div>
+    </div>
+
+    <div class="card">
+        <h4>Production</h4>
+        <div id="production" class="metric">-</div>
+    </div>
+
+    <div class="card">
+        <h4>Change</h4>
+        <div id="change" class="metric">-</div>
+    </div>
+
+    <div class="card">
+        <h4>Status</h4>
+        <div id="status" class="metric">-</div>
+    </div>
+</div>
+
+<div class="alert" id="alertBox">🚨 DRIFT DETECTED!</div>
+
+<canvas id="lineChart"></canvas>
+
+<script>
+let chart;
+
+async function fetchData() {
+    const res = await fetch('/api/data');
+    const data = await res.json();
+
+    const latest = data[data.length - 1];
+
+    document.getElementById("baseline").innerText = latest.baseline;
+    document.getElementById("production").innerText = latest.production;
+    document.getElementById("change").innerText = latest.change;
+
+    const status = document.getElementById("status");
+    const alertBox = document.getElementById("alertBox");
+
+    if (latest.drift) {
+        status.innerText = "DRIFT";
+        status.style.color = "red";
+        alertBox.style.display = "block";
+
+        // 🔊 Sound alert
+        new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
+    } else {
+        status.innerText = "OK";
+        status.style.color = "lightgreen";
+        alertBox.style.display = "none";
+    }
+
+    updateChart(data);
+}
+
+function updateChart(data) {
+    const labels = data.map(d => d.time);
+    const values = data.map(d => d.production);
+
+    if (!chart) {
+        const ctx = document.getElementById('lineChart').getContext('2d');
+
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Production Trend',
+                    data: values,
+                    tension: 0.3
+                }]
+            }
+        });
+    } else {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = values;
+        chart.update();
+    }
+}
+
+// realtime mỗi 3s
+setInterval(fetchData, 3000);
+fetchData();
+</script>
+
+</body>
+</html>

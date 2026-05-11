@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MLOps Monitoring</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .metric {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        canvas {
+            margin-top: 20px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 10px;
+            cursor: grab;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .alert {
+            background: red;
+            padding: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        button {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>🚀 MLOps Monitoring Dashboard</h2>
+
+<div class="grid">
+    <div class="card">
+        <h4>Baseline</h4>
+        <div id="baseline" class="metric">-</div>
+    </div>
+
+    <div class="card">
+        <h4>Production</h4>
+        <div id="production" class="metric">-</div>
+    </div>
+
+    <div class="card">
+        <h4>Change</h4>
+        <div id="change" class="metric">-</div>
+    </div>
+
+    <div class="card">
+        <h4>Status</h4>
+        <div id="status" class="metric">-</div>
+    </div>
+</div>
+
+<div class="alert" id="alertBox">🚨 DRIFT DETECTED!</div>
+
+<button onclick="resetZoom()">🔄 Reset Zoom</button>
+
+<canvas id="lineChart"></canvas>
+<canvas id="histChart"></canvas>
+
+<script>
+let chart, histChart;
+
+// =============================
+// FETCH DATA
+// =============================
+async function fetchData() {
+    const res = await fetch('/api/data');
+    const data = await res.json();
+
+    const latest = data[data.length - 1];
+
+    document.getElementById("baseline").innerText = latest.baseline;
+    document.getElementById("production").innerText = latest.production;
+    document.getElementById("change").innerText = latest.change;
+
+    const status = document.getElementById("status");
+    const alertBox = document.getElementById("alertBox");
+
+    if (latest.drift) {
+        status.innerText = "DRIFT";
+        status.style.color = "red";
+        alertBox.style.display = "block";
+    } else {
+        status.innerText = "OK";
+        status.style.color = "lightgreen";
+        alertBox.style.display = "none";
+    }
+
+    updateChart(data);
+    updateHistogram(data);
+}
+
+// =============================
+// LINE CHART
+// =============================
+function updateChart(data) {
+    const labels = data.map(d => d.time);
+    const production = data.map(d => d.production);
+    const baseline = data.map(d => d.baseline);
+    const driftPoints = data.map(d => d.drift ? d.production : null);
+    const anomalyPoints = data.map(d => d.anomaly ? d.production : null);
+
+    if (!chart) {
+        const ctx = document.getElementById('lineChart').getContext('2d');
+
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Baseline', data: baseline, borderDash: [5,5] },
+                    { label: 'Production', data: production },
+                    { label: 'Drift', data: driftPoints, pointRadius: 6, showLine: false },
+                    { label: 'Anomaly', data: anomalyPoints, pointRadius: 8, showLine: false }
+                ]
+            },
+            options: {
+                plugins: {
+                    zoom: {
+                        pan: { enabled: true, mode: 'x' },
+                        zoom: {
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'x'
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = baseline;
+        chart.data.datasets[1].data = production;
+        chart.data.datasets[2].data = driftPoints;
+        chart.data.datasets[3].data = anomalyPoints;
+        chart.update();
+    }
+}
+
+// =============================
+// HISTOGRAM
+// =============================
+function createHistogram(values, bins = 5) {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const step = (max - min) / bins;
+
+    let hist = new Array(bins).fill(0);
+
+    values.forEach(v => {
+        let idx = Math.min(Math.floor((v - min) / step), bins - 1);
+        hist[idx]++;
+    });
+
+    return {
+        labels: hist.map((_, i) => `${(min + i*step).toFixed(1)}`),
+        data: hist
+    };
+}
+
+function updateHistogram(data) {
+    const values = data.map(d => d.production);
+    const hist = createHistogram(values);
+
+    const ctx = document.getElementById('histChart').getContext('2d');
+
+    if (!histChart) {
+        histChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: hist.labels,
+                datasets: [{ label: 'Distribution', data: hist.data }]
+            }
+        });
+    } else {
+        histChart.data.labels = hist.labels;
+        histChart.data.datasets[0].data = hist.data;
+        histChart.update();
+    }
+}
+
+// =============================
+function resetZoom() {
+    if (chart) chart.resetZoom();
+}
+
+// =============================
+setInterval(fetchData, 3000);
+fetchData();
+</script>
+
+</body>
+</html>

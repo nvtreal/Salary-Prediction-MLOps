@@ -1,0 +1,76 @@
+import pandas as pd
+import whylogs as why
+import datetime
+import os
+
+# =========================================
+# 1. Simulate Data
+# =========================================
+baseline_data = {
+    "YearsExperience": [1.0, 2.0, 3.0, 4.0, 5.0, 2.5, 3.5]
+}
+production_data = {
+    "YearsExperience": [10.0, 12.0, 15.0, 20.0, 18.0, 11.0, 14.0]
+}
+
+df_baseline = pd.DataFrame(baseline_data)
+df_production = pd.DataFrame(production_data)
+
+print(f"[*] Monitoring started at: {datetime.datetime.now()}")
+
+# =========================================
+# 2. Create Profiles
+# =========================================
+baseline_profile = why.log(df_baseline)
+production_profile = why.log(df_production)
+
+# =========================================
+# 3. Save WHYLOGS FILE (chuẩn)
+# =========================================
+def save_profile(profile, path):
+    profile.write(path)
+    return os.path.abspath(path)
+
+try:
+    baseline_path = save_profile(baseline_profile, "baseline_profile.bin")
+    production_path = save_profile(production_profile, "production_profile.bin")
+
+    print(f"[✓] Baseline profile saved: {baseline_path}")
+    print(f"[✓] Production profile saved: {production_path}")
+
+except Exception as e:
+    print("[✗] Failed to save profile")
+    print(e)
+
+# =========================================
+# 4. Drift Detection (simple)
+# =========================================
+def detect_drift(df_base, df_prod, threshold=0.3):
+    drift_report = {}
+
+    for col in df_base.columns:
+        mean_base = df_base[col].mean()
+        mean_prod = df_prod[col].mean()
+
+        change = abs(mean_prod - mean_base) / (abs(mean_base) + 1e-6)
+
+        drift_report[col] = {
+            "baseline_mean": mean_base,
+            "production_mean": mean_prod,
+            "change_ratio": change,
+            "drift_detected": change > threshold
+        }
+
+    return drift_report
+
+drift = detect_drift(df_baseline, df_production)
+
+print("\n[📊] Drift Analysis:")
+for col, info in drift.items():
+    print(f"\nFeature: {col}")
+    print(f" - Baseline mean: {info['baseline_mean']}")
+    print(f" - Production mean: {info['production_mean']}")
+    print(f" - Change ratio: {info['change_ratio']:.2f}")
+    print(f" - Drift detected: {info['drift_detected']}")
+
+print("\n[*] Monitoring completed.")

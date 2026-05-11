@@ -1,0 +1,16 @@
+# Data Processing & ML
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+
+# MLOps Tracking & Serving
+mlflow
+
+# Monitoring
+whylogs
+whylabs-client
+
+# API Testing
+requests
